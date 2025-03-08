@@ -16,7 +16,7 @@ public class ChatMessage implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	public enum MessageType{
-		/*Mensaje*
+		/*Mensaje*/
 		MESSAGE,
 		/*Shutdom del servidor*/
 		SHUTDOWN,
