@@ -111,10 +111,7 @@ public class ChatClientImpl implements ChatClient {
 			out = new ObjectOutputStream(socket.getOutputStream());
 			//Mensaje de bienvenida si la conexión es correcta
 			SimpleDateFormat hora = new SimpleDateFormat("HH:mm;ss");
-			System.out.println("Fernando patrocina el mensaje: "
-					+ "Conexión establecida correctamente");
-			System.out.println("Fernando patrocina el mensaje: "
-					+ "Son las: [" + hora + 
+			System.out.println("Fernando patrocina el mensaje: Son las: [" + hora + 
 					"]. Conexión establecida correctamente");
 			
 			//Apertura de mensajes para el cliente
@@ -211,29 +208,21 @@ public class ChatClientImpl implements ChatClient {
 	 */
 	public static void main(String[] args) {
 		// Variables para gestión de los argumentos
-		String servidor; // identificación del servidor que se recibe por parámetro
-		String usuario; // identificación del usuario que se recibe por parámetro
-		int puerto; //identificación del puerto de enlace
+		String servidor = null; // identificación del servidor que se recibe por parámetro
+		String usuario = null; // identificación del usuario que se recibe por parámetro
 		
 		//En función de los parámetros recibidos se actualiza el valor de las variables
 		switch (args.length) {
 			case 1: //Cuando hay solamente un argumento, éste corresponde al usuario
 				servidor = DEFAULT_HOST; //El servidor será el servidor por defecto
 				usuario = args[0]; //El usuario será el que se pase por argumento
-				puerto = DEFAULT_PORT; //el puerto será el puerto por defecto
 				break;
 				
 			case 2: // en este caso se reciben ambos datos
 				servidor = args[0]; // el servidor en la primera posición
 				usuario = args[1]; // el usuario en la segunda
-				puerto = DEFAULT_PORT; //el puerto será el puerto por defecto
 				break;
 				
-			case 3: // en este caso se reciben ambos datos
-				servidor = args[0]; // el servidor en la primera posición
-				usuario = args[1]; // el usuario en la segunda
-				puerto = Integer.parseInt(args[2]); // el puerto en la tercera
-				break;
 				
 			default: // En cualquier otro caso se envia mensaje de advertencia
 				System.out.println("Fernando patrocina el mensaje:"
@@ -242,12 +231,11 @@ public class ChatClientImpl implements ChatClient {
 		}
 		
 		// Una vez registrados los parámetros se lanza el chat
-		
-		new ChatClientImpl(servidor,usuario,puerto).start();
+		new ChatClientImpl(servidor,usuario).start();
 
 	}
 	
-	class ChatClientListener implements Runnable{
+	private static class ChatClientListener implements Runnable{
 		//Variable de Entrada de datos
 		private ObjectInputStream in;
 		
@@ -260,7 +248,7 @@ public class ChatClientImpl implements ChatClient {
 		
 		
 		/*
-		 * Arranca el oyent
+		 * Arranca el oyente
 		 * 
 		 * @param in
 		 * @param active
