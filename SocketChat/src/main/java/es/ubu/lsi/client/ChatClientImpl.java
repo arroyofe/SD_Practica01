@@ -97,7 +97,10 @@ public class ChatClientImpl implements ChatClient {
 		this(username,DEFAULT_HOST,DEFAULT_PORT);
 		
 	}
-
+	/*
+	 * Metodo de inicio del chat por parte de un usuario
+	 * @return true si el arranque es correcto y false en caso contrario 
+	 */
 	@Override
 	public boolean start() {
 		try {
@@ -128,23 +131,78 @@ public class ChatClientImpl implements ChatClient {
 			BufferedReader lectura = new BufferedReader(new InputStreamReader(System.in));
 			
 			
+			//lectura de las entradas
+			while (lectura.readLine()!= null && carryOn) {
+				//Entrada logout para salir del chat
+				if(lectura.readLine().equals("logout")) {
+					carryOn = false;
+					sendMessage(new ChatMessage(id,MessageType.LOGOUT,"Fernando patrocina el mensaje: "));
+				}else if(lectura.readLine().equals("ban")){ //Entrada de baneo de un usuario
+					//variable para almacenar el usuario baneado, tomando solamente el nombre
+					String baneado = lectura.readLine().split("")[1];
+					//Se almacena el usuario baneado en el mapa creado al efecto
+					this.baneados.put(baneado.hashCode(), baneado);
+					sendMessage(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: " 
+					+ username + "ha baneado al usuario: " + baneado));
+				}else if(lectura.readLine().equals("unban")){ //Entrada de anulación de baneo de un usuario
+					//variable para almacenar el usuario desbaneado, tomando solamente el nombre
+					String desbaneado = lectura.readLine().split("")[1];
+					//Se elimina el usuario desbaneado en el mapa creado para los baneados
+					this.baneados.remove(desbaneado.hashCode(), desbaneado);
+					sendMessage(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: " 
+					+ username + "ha desbaneado al usuario: " + desbaneado));
+				}else {//En el resto de los casos se trata de un post del chat normal y se muestra
+					sendMessage(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: " 
+							+ username + " dice: " + lectura.readLine()));
+				}
+			}
+			
 		}catch(IOException e) {
 			e.printStackTrace();
 			return false;
 		}
+		//Al terminar el chat se desconecta al usuario
 		disconnect();
 		return true;
 	}
-
+	
+	/*
+	 * Gestión de mensajes del servidor relativos a cada usuario
+	 * 
+	 * @param mensaje a enviar
+	 * 
+	 */
 	@Override
 	public void sendMessage(ChatMessage message) {
-		// TODO Auto-generated method stub
+
+		try {
+			out.writeObject (message);
+		}catch (IOException e){
+			e.printStackTrace();
+		}
 
 	}
-
+	
+	/*
+	 * Desconexion del cliente
+	 */
 	@Override
 	public void disconnect() {
-		// TODO Auto-generated method stub
+		// Se pasa el carriOn a false para indicar el final
+		carryOn = false;
+		
+		// Se para el oyente
+		escuchaCliente.pararChat();
+		
+		//Se cierran los streams y el socket
+		try {
+			out.close();
+			in.close();
+			socket.close();
+			
+		}catch(IOException e) {
+			e.printStackTrace();
+		}
 
 	}
 
@@ -152,7 +210,40 @@ public class ChatClientImpl implements ChatClient {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
+		// Variables para gestión de los argumentos
+		String servidor; // identificación del servidor que se recibe por parámetro
+		String usuario; // identificación del usuario que se recibe por parámetro
+		int puerto; //identificación del puerto de enlace
+		
+		//En función de los parámetros recibidos se actualiza el valor de las variables
+		switch (args.length) {
+			case 1: //Cuando hay solamente un argumento, éste corresponde al usuario
+				servidor = DEFAULT_HOST; //El servidor será el servidor por defecto
+				usuario = args[0]; //El usuario será el que se pase por argumento
+				puerto = DEFAULT_PORT; //el puerto será el puerto por defecto
+				break;
+				
+			case 2: // en este caso se reciben ambos datos
+				servidor = args[0]; // el servidor en la primera posición
+				usuario = args[1]; // el usuario en la segunda
+				puerto = DEFAULT_PORT; //el puerto será el puerto por defecto
+				break;
+				
+			case 3: // en este caso se reciben ambos datos
+				servidor = args[0]; // el servidor en la primera posición
+				usuario = args[1]; // el usuario en la segunda
+				puerto = Integer.parseInt(args[2]); // el puerto en la tercera
+				break;
+				
+			default: // En cualquier otro caso se envia mensaje de advertencia
+				System.out.println("Fernando patrocina el mensaje:"
+						+"Error. Pasar por parámetos [servidor] (opcional) <usuario> (obligatorio)");
+				break;
+		}
+		
+		// Una vez registrados los parámetros se lanza el chat
+		
+		new ChatClientImpl(servidor,usuario,puerto).start();
 
 	}
 	
@@ -161,33 +252,59 @@ public class ChatClientImpl implements ChatClient {
 		private ObjectInputStream in;
 		
 		// Booleano para saber si el cliente está activo y actuar en consecuencia
-		private boolean active;
+		private boolean activo=false;
 		
 		// Propietario del chat
 		private ChatClientImpl propietario;
 		
 		
 		
-		/**
+		/*
+		 * Arranca el oyent
+		 * 
 		 * @param in
 		 * @param active
 		 */
 		public ChatClientListener(ObjectInputStream in) {
 			this.in = in;
-			active = true;
+			activo = true;
 		}
 
-
-
+		/*
+		 * Para el chat del cliente 
+		 */
+		public void pararChat() {
+			activo= false;
+		}
+		
+		/*
+		 * Método set para crear el cliente propietario del post en el chat
+		 * 
+		 * @param propietario del post
+		 */
 		public void setOwner(ChatClientImpl propietario) {
 			this.propietario = propietario;
 			
 		}
 
 
-
+		/*
+		 * Arranca el chat
+		 */
 		@Override
 		public void run() {
+			try {
+				ChatMessage mensaje = (ChatMessage) in.readObject();
+				System.out.println("Fernando patrocina el mensaje: " 
+				+ mensaje.getId() + " " + mensaje.getMessage());
+				
+			}catch(IOException e) {
+				e.printStackTrace();
+			}catch(ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+			
+			propietario.disconnect();
 			
 		}
 		
