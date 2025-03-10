@@ -34,7 +34,7 @@ public class ChatServerImpl implements ChatServer {
 	private int port;
 	
 	//Booleano que indica si la sesión está activa
-	private boolean alive;
+	private boolean alive=true;
 	
 	//Socket del usuario
 	private Socket socket;
@@ -53,9 +53,9 @@ public class ChatServerImpl implements ChatServer {
 	 * Constructor por defecto
 	 * 
 	 */
-	public ChatServerImpl() {
+/*	public ChatServerImpl() {
 
-	}
+	}*/
 
 	@Override
 	public void startup() {
@@ -67,7 +67,7 @@ public class ChatServerImpl implements ChatServer {
 			socketServ = new ServerSocket(this.port);
 			//Comunicación de apertura del socket
 			System.out.println("Fernando patrocina el mensaje: Servidor iniciado a las "
-					+ sdf.format(new Date()));
+					/*+ sdf.format(new Date())*/);
 			
 			//Bucle de gestión de los mensajes de los clientes
 			while (alive) {
@@ -173,7 +173,8 @@ public class ChatServerImpl implements ChatServer {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		// TODO Auto-generated method stub
+		// Se lanza el servidor
+		ChatServerImpl.getInstance().startup();
 
 	}
 	
@@ -194,7 +195,7 @@ public class ChatServerImpl implements ChatServer {
 		//Flujo de salida
 		private ObjectOutputStream out;
 		
-		private boolean activo = false;
+		private boolean activo = true;
 		
 
 		/*
