@@ -36,7 +36,7 @@ public class ChatClientImpl implements ChatClient {
 	private String username;
 	
 	//Puerto por el que se comunica el cliente
-	private int port;
+	private int port=DEFAULT_PORT;
 	
 	//
 	private boolean carryOn = true;
@@ -208,19 +208,19 @@ public class ChatClientImpl implements ChatClient {
 	 */
 	public static void main(String[] args) {
 		// Variables para gestión de los argumentos
-		String servidor = null; // identificación del servidor que se recibe por parámetro
-		String usuario = null; // identificación del usuario que se recibe por parámetro
+		String server = ""; // identificación del servidor que se recibe por parámetro
+		String username = ""; // identificación del usuario que se recibe por parámetro
 		
 		//En función de los parámetros recibidos se actualiza el valor de las variables
 		switch (args.length) {
 			case 1: //Cuando hay solamente un argumento, éste corresponde al usuario
-				servidor = DEFAULT_HOST; //El servidor será el servidor por defecto
-				usuario = args[0]; //El usuario será el que se pase por argumento
+				server = DEFAULT_HOST; //El servidor será el servidor por defecto
+				username = args[0]; //El usuario será el que se pase por argumento
 				break;
 				
 			case 2: // en este caso se reciben ambos datos
-				servidor = args[0]; // el servidor en la primera posición
-				usuario = args[1]; // el usuario en la segunda
+				server = args[0]; // el servidor en la primera posición
+				username = args[1]; // el usuario en la segunda
 				break;
 				
 				
@@ -231,7 +231,7 @@ public class ChatClientImpl implements ChatClient {
 		}
 		
 		// Una vez registrados los parámetros se lanza el chat
-		new ChatClientImpl(servidor,usuario).start();
+		new ChatClientImpl(server,username).start();
 
 	}
 	

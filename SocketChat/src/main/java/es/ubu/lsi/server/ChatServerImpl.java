@@ -42,17 +42,19 @@ public class ChatServerImpl implements ChatServer {
 	//Socket del servidor
 	private ServerSocket socketServ ;
 	
+	//instancia del servidor
+	private static ChatServerImpl instance;
+	
 	//Diccionario con los datos de los usuarios
 	private Map<Integer,ServerThreadForClient> cjtoHilosCliente = new HashMap<Integer,ServerThreadForClient>();
 		
 
 	/*
-	 * Constructor 
-	 * @param port
+	 * Constructor por defecto
+	 * 
 	 */
-	public ChatServerImpl(int port) {
+	public ChatServerImpl() {
 
-		this.port = port;
 	}
 
 	@Override
@@ -143,6 +145,29 @@ public class ChatServerImpl implements ChatServer {
 		cjtoHilosCliente.remove(id);
 
 	}
+	
+	/*
+	 * Singleton que asegura la creación de una única instancia del servidor
+	 */
+	public static ChatServerImpl getInstance() {
+		if (instance == null) {
+			instance = new ChatServerImpl();
+		}
+		
+		return instance;
+	}
+	
+	/*
+	 * Hace que el hash del cliente sea su id para la sesión,borrando el valor precedente
+	 * 
+	 * @param hash
+	 * @id
+	 */
+	public void setClientId(int hash, int id) {
+		cjtoHilosCliente.put(hash, cjtoHilosCliente.get(id));
+		cjtoHilosCliente.remove(id);
+		
+	}
 
 	/**
 	 * @param args
@@ -219,7 +244,53 @@ public class ChatServerImpl implements ChatServer {
 		 */
 		public void run() {
 			
-			// TODO Auto-generated method stub
+			try {
+				this.username = ((ChatMessage) in.readObject()).getMessage();
+				// Se crea un id a usando el hash
+				int hash = this.username.hashCode();
+				// Se cambia el id antiguo por el valor del hash
+				ChatServerImpl.getInstance().setClientId(hash,id);
+				id = hash;
+				
+				//Se informa de la conexión del usuario
+				System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
+				+ this.id + " se ha conectado a las: " + ChatServerImpl.getInstance().sdf.format(new Date()));				
+				
+				//Bucle degestión de los mensajes
+				while(activo) {
+					//Se lee el mensaje del cliente
+					ChatMessage mensaje = (ChatMessage) in.readObject();
+					
+					//Si el cliente envía el mensaje de logout se le desactiv
+					if(mensaje.getTipo()==MessageType.LOGOUT) {
+						activo = false;
+						System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
+								+ this.id + " se ha desconectado a las: " + ChatServerImpl.getInstance().sdf.format(new Date()));						
+					}else { //En caso contrario se publica el mensaje SHUTDOWN no se requiere en la práctica
+						System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
+								+ this.id + " ha publicado a las: " + ChatServerImpl.getInstance().sdf.format(new Date()));
+						ChatServerImpl.getInstance().broadcast(mensaje);
+						
+					}
+					
+				}
+				
+			}catch(IOException e) {
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+				
+				e.printStackTrace();
+			}finally {// Se cierra el chat cuanto finaliza el cliente
+				try {
+					in.close();
+					out.close();
+					socket.close();
+					ChatServerImpl.getInstance().remove(id);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}		
+			}
 			
 		}
 		
