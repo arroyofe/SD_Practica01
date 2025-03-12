@@ -10,6 +10,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,7 +37,7 @@ public class ChatClientImpl implements ChatClient {
 	private String username;
 	
 	//Puerto por el que se comunica el cliente
-	private int port=DEFAULT_PORT;
+	private static int port=DEFAULT_PORT;
 	
 	//
 	private boolean carryOn = true;
@@ -59,6 +60,9 @@ public class ChatClientImpl implements ChatClient {
 	//Variable socket para la gestión de las conexiones
 	private Socket socket;
 	
+	//Hora 
+	private SimpleDateFormat hora = new SimpleDateFormat("HH:mm:ss");
+	
 
 	/*
 	 * Constructor Crea los datos del chat con todos los datos por parámetro
@@ -70,7 +74,7 @@ public class ChatClientImpl implements ChatClient {
 	public ChatClientImpl(String server, String username, int port) {
 		this.server = server;
 		this.username = username;
-		this.port = port;
+		ChatClientImpl.port = port;
 		this.id = username.hashCode();
 		this.carryOn= false;
 	}
@@ -89,6 +93,7 @@ public class ChatClientImpl implements ChatClient {
 	
 	/*
 	 * Constructor Crea los datos del chat con el cliente solamente.
+	 * 
 	 * El puerto y el servidor se escogen con el valor por defecto
 	 * 
 	 * @param username
@@ -99,6 +104,7 @@ public class ChatClientImpl implements ChatClient {
 	}
 	/*
 	 * Metodo de inicio del chat por parte de un usuario
+	 * 
 	 * @return true si el arranque es correcto y false en caso contrario 
 	 */
 	@Override
@@ -106,13 +112,17 @@ public class ChatClientImpl implements ChatClient {
 		try {
 			//Apertura de la connexión
 			socket = new Socket(server,port);
+			
+			//Mensaje de bienvenida si la conexión es correcta
+			System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
+					"]. Conexión establecida correctamente");
+			System.out.println("Fernando patrocina el mensaje: Cliente nuevo en servidor: / " + server + 
+					" Usuario: " + username);
+			
 			//Creación de las entradas y salidas
 			in = new ObjectInputStream(socket.getInputStream());
 			out = new ObjectOutputStream(socket.getOutputStream());
-			//Mensaje de bienvenida si la conexión es correcta
-			SimpleDateFormat hora = new SimpleDateFormat("HH:mm;ss");
-			System.out.println("Fernando patrocina el mensaje: Son las: [" + hora + 
-					"]. Conexión establecida correctamente");
+			
 			
 			//Apertura de mensajes para el cliente
 			out.writeObject(new ChatMessage(id,MessageType.MESSAGE,username));
@@ -223,7 +233,6 @@ public class ChatClientImpl implements ChatClient {
 				username = args[1]; // el usuario en la segunda
 				break;
 				
-				
 			default: // En cualquier otro caso se envia mensaje de advertencia
 				System.out.println("Fernando patrocina el mensaje:"
 						+"Error. Pasar por parámetos [servidor] (opcional) <usuario> (obligatorio)");
@@ -231,7 +240,7 @@ public class ChatClientImpl implements ChatClient {
 		}
 		
 		// Una vez registrados los parámetros se lanza el chat
-		new ChatClientImpl(server,username).start();
+		new ChatClientImpl(server,username,port).start();
 
 	}
 	
@@ -240,7 +249,7 @@ public class ChatClientImpl implements ChatClient {
 		private ObjectInputStream in;
 		
 		// Booleano para saber si el cliente está activo y actuar en consecuencia
-		private boolean activo=false;
+		private boolean activo=true;
 		
 		// Propietario del chat
 		private ChatClientImpl propietario;

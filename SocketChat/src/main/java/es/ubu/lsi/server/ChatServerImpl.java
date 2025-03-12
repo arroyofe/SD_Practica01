@@ -17,6 +17,7 @@ import es.ubu.lsi.common.ChatMessage;
 import es.ubu.lsi.common.ChatMessage.MessageType;
 
 /**
+ * Implementación del servidor del chat
  * 
  */
 public class ChatServerImpl implements ChatServer {
@@ -25,10 +26,10 @@ public class ChatServerImpl implements ChatServer {
 	private static int DEFAULT_PORT =1500;
 	
 	//Identificación del cliente
-	private int  clientId;
+	private int  clientId=0;
 	
-	//Fecha
-	private SimpleDateFormat sdf;
+	//Hora 
+	private SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
 	
 	//Puerto que se usa
 	private int port;
@@ -67,17 +68,21 @@ public class ChatServerImpl implements ChatServer {
 			socketServ = new ServerSocket(this.port);
 			//Comunicación de apertura del socket
 			System.out.println("Fernando patrocina el mensaje: Servidor iniciado a las "
-					/*+ sdf.format(new Date())*/);
+					+ sdf.format(new Date()));
 			
 			//Bucle de gestión de los mensajes de los clientes
 			while (alive) {
 				// El socket abierto para el servidor se acepta
 				socket = socketServ.accept();
 				
-				//Id para el usuario reicen creado
-				clientId--;
+				// Id para el usuario recien creado, añadimos una unidad
+				clientId++;
 				ServerThreadForClient hiloCliente = new ServerThreadForClient(clientId,socket);
+				
+				// Se almacena el cliente y el hilo en el mapa creado al efecto
 				cjtoHilosCliente.put(clientId,hiloCliente);
+				
+				//Se arranca el hilo recién creado
 				hiloCliente.start();
 			}
 			
@@ -113,16 +118,16 @@ public class ChatServerImpl implements ChatServer {
 	}
 	
 	/*
-	 *  Envia los mensajes recibidos a todos los clientes
+	 *  Envia los mensajes recibidos a todos los clientes presentes en el chat
 	 *  
 	 *  @param mensaje
 	 */
 	@Override
 	public void broadcast(ChatMessage mensaje) {
 		// Envío de los mensajes a todos los clientes
-		for (int hilo :cjtoHilosCliente.keySet()) {
-			if(hilo !=mensaje.getId()) {
-				cjtoHilosCliente.get(hilo).sendMessage(mensaje);
+		for (int hiloCliente :cjtoHilosCliente.keySet()) {
+			if(hiloCliente !=mensaje.getId()) {
+				cjtoHilosCliente.get(hiloCliente).sendMessage(mensaje);
 			}
 		}
 
@@ -160,11 +165,11 @@ public class ChatServerImpl implements ChatServer {
 	/*
 	 * Hace que el hash del cliente sea su id para la sesión,borrando el valor precedente
 	 * 
-	 * @param hash
-	 * @id
+	 * @param nuevoId
+	 * @param id
 	 */
-	public void setClientId(int hash, int id) {
-		cjtoHilosCliente.put(hash, cjtoHilosCliente.get(id));
+	public void setClientId(int nuevoId, int id) {
+		cjtoHilosCliente.put(nuevoId, cjtoHilosCliente.get(id));
 		cjtoHilosCliente.remove(id);
 		
 	}
@@ -199,7 +204,7 @@ public class ChatServerImpl implements ChatServer {
 		
 
 		/*
-		 * Constructor*
+		 * Constructor
 		 * @param id
 		 * @param socket
 		 */
@@ -248,14 +253,14 @@ public class ChatServerImpl implements ChatServer {
 			try {
 				this.username = ((ChatMessage) in.readObject()).getMessage();
 				// Se crea un id a usando el hash
-				int hash = this.username.hashCode();
+				int nuevo = this.username.hashCode();
 				// Se cambia el id antiguo por el valor del hash
-				ChatServerImpl.getInstance().setClientId(hash,id);
-				id = hash;
+				ChatServerImpl.getInstance().setClientId(nuevo,id);
+				id = nuevo;
 				
 				//Se informa de la conexión del usuario
-				System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
-				+ this.id + " se ha conectado a las: " + ChatServerImpl.getInstance().sdf.format(new Date()));				
+				System.out.println("Fernando patrocina el mensaje : Bienvenido " + this.username +"con id:" 
+				+ this.id + " te has conectado a las: " + ChatServerImpl.getInstance().sdf.format(new Date( )));				
 				
 				//Bucle degestión de los mensajes
 				while(activo) {
@@ -266,10 +271,10 @@ public class ChatServerImpl implements ChatServer {
 					if(mensaje.getTipo()==MessageType.LOGOUT) {
 						activo = false;
 						System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
-								+ this.id + " se ha desconectado a las: " + ChatServerImpl.getInstance().sdf.format(new Date()));						
+								+ this.id + " se ha desconectado a las: " + ChatServerImpl.getInstance().sdf.format(new Date( )));						
 					}else { //En caso contrario se publica el mensaje SHUTDOWN no se requiere en la práctica
 						System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
-								+ this.id + " ha publicado a las: " + ChatServerImpl.getInstance().sdf.format(new Date()));
+								+ this.id + " ha publicado a las: " + ChatServerImpl.getInstance().sdf.format(new Date( )));
 						ChatServerImpl.getInstance().broadcast(mensaje);
 						
 					}
@@ -281,14 +286,13 @@ public class ChatServerImpl implements ChatServer {
 			} catch (ClassNotFoundException e) {
 				
 				e.printStackTrace();
-			}finally {// Se cierra el chat cuanto finaliza el cliente
+			}finally {// Se cierra el chat y sus componentes cuanto finaliza el cliente
 				try {
 					in.close();
 					out.close();
 					socket.close();
 					ChatServerImpl.getInstance().remove(id);
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}		
 			}
