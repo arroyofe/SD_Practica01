@@ -32,6 +32,6 @@ public interface ChatClient {
 	/*
 	 * Desconecta al cliente
 	 */
-	 public void disconnect();
+	public void disconnect();
 
 }

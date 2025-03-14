@@ -13,6 +13,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 
 import es.ubu.lsi.common.ChatMessage;
 import es.ubu.lsi.common.ChatMessage.MessageType;
@@ -58,7 +59,7 @@ public class ChatClientImpl implements ChatClient {
 	private Map<Integer,String> baneados = new HashMap<Integer,String>();
 	
 	//Variable socket para la gestión de las conexiones
-	private Socket socket;
+	private static Socket socket;
 	
 	//Hora 
 	private SimpleDateFormat hora = new SimpleDateFormat("HH:mm:ss");
@@ -74,9 +75,9 @@ public class ChatClientImpl implements ChatClient {
 	public ChatClientImpl(String server, String username, int port) {
 		this.server = server;
 		this.username = username;
-		ChatClientImpl.port = port;
-		this.id = username.hashCode();
-		this.carryOn= false;
+		this.port = port;
+	//	this.id = username.hashCode();
+	//	this.carryOn= false;
 	}
 	
 	/*
@@ -116,13 +117,21 @@ public class ChatClientImpl implements ChatClient {
 			//Mensaje de bienvenida si la conexión es correcta
 			System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
 					"]. Conexión establecida correctamente");
+			/*
 			System.out.println("Fernando patrocina el mensaje: Cliente nuevo en servidor: / " + server + 
 					" Usuario: " + username);
-			
+			*/
 			//Creación de las entradas y salidas
 			in = new ObjectInputStream(socket.getInputStream());
 			out = new ObjectOutputStream(socket.getOutputStream());
 			
+			// Registro de entrada en el servidor
+			ChatMessage registro = new ChatMessage (0,MessageType.MESSAGE,String.format("username %s", username));
+			sendMessage(registro);
+			
+			//Se recibe el id de cliente proporcionado por el servidor
+			ChatMessage confirmacion =  (ChatMessage) in.readObject();
+			id =confirmacion.getId();
 			
 			//Apertura de mensajes para el cliente
 			out.writeObject(new ChatMessage(id,MessageType.MESSAGE,username));
@@ -134,38 +143,12 @@ public class ChatClientImpl implements ChatClient {
 			//Creación de un hilo nuevo del cliente
 			new Thread(escuchaCliente).start();
 			
-			//Variable para recoger el post en el chat del cliente
-			BufferedReader lectura = new BufferedReader(new InputStreamReader(System.in));
-			
-			
-			//lectura de las entradas
-			while (lectura.readLine()!= null && carryOn) {
-				//Entrada logout para salir del chat
-				if(lectura.readLine().equals("logout")) {
-					carryOn = false;
-					sendMessage(new ChatMessage(id,MessageType.LOGOUT,"Fernando patrocina el mensaje: "));
-				}else if(lectura.readLine().equals("ban")){ //Entrada de baneo de un usuario
-					//variable para almacenar el usuario baneado, tomando solamente el nombre
-					String baneado = lectura.readLine().split("")[1];
-					//Se almacena el usuario baneado en el mapa creado al efecto
-					this.baneados.put(baneado.hashCode(), baneado);
-					sendMessage(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: " 
-					+ username + "ha baneado al usuario: " + baneado));
-				}else if(lectura.readLine().equals("unban")){ //Entrada de anulación de baneo de un usuario
-					//variable para almacenar el usuario desbaneado, tomando solamente el nombre
-					String desbaneado = lectura.readLine().split("")[1];
-					//Se elimina el usuario desbaneado en el mapa creado para los baneados
-					this.baneados.remove(desbaneado.hashCode(), desbaneado);
-					sendMessage(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: " 
-					+ username + "ha desbaneado al usuario: " + desbaneado));
-				}else {//En el resto de los casos se trata de un post del chat normal y se muestra
-					sendMessage(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: " 
-							+ username + " dice: " + lectura.readLine()));
-				}
-			}
-			
 		}catch(IOException e) {
 			e.printStackTrace();
+			return false;
+		}catch(Exception e) {
+			e.getMessage();
+			disconnect();
 			return false;
 		}
 		//Al terminar el chat se desconecta al usuario
@@ -212,6 +195,10 @@ public class ChatClientImpl implements ChatClient {
 		}
 
 	}
+	
+	public int getId() {
+		return this.id;
+	}
 
 	/**
 	 * @param args
@@ -239,9 +226,43 @@ public class ChatClientImpl implements ChatClient {
 				break;
 		}
 		
+		System.out.println("Fernando patrocina el mensaje: Escuchando al puerto: " + port );
+		
 		// Una vez registrados los parámetros se lanza el chat
-		new ChatClientImpl(server,username,port).start();
-
+		ChatClient cliente = new ChatClientImpl(server,username,port);
+		cliente.start();
+		int id = cliente.hashCode();
+		
+		//Mensaje de bienvenida
+		System.out.println("Fernando patrocina el mensaje: Conexión establecida con el servidor, introducza su post " );
+		
+		Scanner lectura = new Scanner (System.in);
+	
+		while (true) {
+			String enviado = lectura.nextLine();
+			String[] enviadoVector = enviado.split("",2);
+			ChatMessage mensaje;
+			
+			//Identificación del tipo de mensaje
+			if("logout".equalsIgnoreCase(enviadoVector[0])) {
+				mensaje= new ChatMessage(id,MessageType.LOGOUT,enviado);
+			}else if ("shutdown".equalsIgnoreCase(enviadoVector[0])) {
+				mensaje= new ChatMessage(id,MessageType.SHUTDOWN,enviado);
+			}else {
+				mensaje= new ChatMessage(id,MessageType.MESSAGE,enviado);
+			}
+			
+			//Envio del mensaje
+			cliente.sendMessage(mensaje);
+			
+			//Cuando el mensaje sea de logout se desconecta al cliente
+			if(mensaje.getTipo() == MessageType.LOGOUT) {
+				cliente.disconnect();
+				break;
+				
+			}
+		}
+		
 	}
 	
 	private static class ChatClientListener implements Runnable{
@@ -290,21 +311,22 @@ public class ChatClientImpl implements ChatClient {
 		 */
 		@Override
 		public void run() {
-			try {
-				ChatMessage mensaje = (ChatMessage) in.readObject();
-				System.out.println("Fernando patrocina el mensaje: " 
-				+ mensaje.getId() + " " + mensaje.getMessage());
-				
-			}catch(IOException e) {
-				e.printStackTrace();
-			}catch(ClassNotFoundException e) {
-				e.printStackTrace();
+			while (socket.isConnected()) {
+				try {
+					ChatMessage mensaje = (ChatMessage) in.readObject();
+					if (mensaje.getTipo() == MessageType.MESSAGE) {
+						System.out.println(
+								"Fernando patrocina el mensaje: " + mensaje.getId() + " " + mensaje.getMessage());
+					}
+
+				} catch (IOException e) {
+					e.printStackTrace();
+				} catch (ClassNotFoundException e) {
+					e.printStackTrace();
+				}
 			}
-			
-			propietario.disconnect();
-			
 		}
-		
+
 	}
 
 }

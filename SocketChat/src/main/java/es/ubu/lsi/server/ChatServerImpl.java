@@ -3,9 +3,12 @@
  */
 package es.ubu.lsi.server;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
@@ -35,7 +38,7 @@ public class ChatServerImpl implements ChatServer {
 	private int port;
 	
 	//Booleano que indica si la sesión está activa
-	private boolean alive=true;
+	private boolean alive;
 	
 	//Socket del usuario
 	private Socket socket;
@@ -47,19 +50,17 @@ public class ChatServerImpl implements ChatServer {
 	private static ChatServerImpl instance;
 	
 	//Diccionario con los datos de los usuarios
-	private Map<Integer,ServerThreadForClient> cjtoHilosCliente = new HashMap<Integer,ServerThreadForClient>();
-		
-
-	/*
-	 * Constructor por defecto
-	 * 
-	 */
-/*	public ChatServerImpl() {
-
-	}*/
+	private Map<Integer,ServerThreadForClient> cjtoClientes = new HashMap<Integer,ServerThreadForClient>();
+	
+	//Diccionario de clientes baneaso
+	private Map<Integer,ServerThreadForClient> cjtoClientesBaneados = new HashMap<Integer,ServerThreadForClient>();
+	
 
 	@Override
 	public void startup() {
+		// Se "despierta" el sistema
+		alive=true;
+		
 		// Determinación del puerto
 		this.port = DEFAULT_PORT;
 		
@@ -69,21 +70,40 @@ public class ChatServerImpl implements ChatServer {
 			//Comunicación de apertura del socket
 			System.out.println("Fernando patrocina el mensaje: Servidor iniciado a las "
 					+ sdf.format(new Date()));
+			System.out.println("Escuchando al puerto: " + port);
 			
 			//Bucle de gestión de los mensajes de los clientes
 			while (alive) {
-				// El socket abierto para el servidor se acepta
+				// El socket abierto para el servidor se usa para el cliente
 				socket = socketServ.accept();
 				
 				// Id para el usuario recien creado, añadimos una unidad
 				clientId++;
-				ServerThreadForClient hiloCliente = new ServerThreadForClient(clientId,socket);
+				
+				//Recepción de mensajes de los clientes
+				BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				
+				//Impresión en pantalla de los mensajes recibidos
+				PrintWriter out = new PrintWriter(socket.getOutputStream(),true);
+				
+				//Extracción de los datos del usuario
+				out.println(clientId);
+				String usuario = in.readLine();
+				
+				if (cjtoClientes.containsKey(clientId)){
+					
+					System.out.println("Usuario actualmente en uso.");
+					socket.close();
+				}else {
+				
+				ServerThreadForClient hiloCliente = new ServerThreadForClient(clientId,usuario,socket);
 				
 				// Se almacena el cliente y el hilo en el mapa creado al efecto
-				cjtoHilosCliente.put(clientId,hiloCliente);
+				cjtoClientes.put(clientId,hiloCliente);
 				
 				//Se arranca el hilo recién creado
 				hiloCliente.start();
+				}
 			}
 			
 		}catch(IOException e) {
@@ -98,7 +118,7 @@ public class ChatServerImpl implements ChatServer {
 	@Override
 	public void shutdown() {
 		// Primer paso: parada de los chats de los usuarios
-		for (ServerThreadForClient chat :cjtoHilosCliente.values()) {
+		for (ServerThreadForClient chat :cjtoClientes.values()) {
 			chat.stopChat();
 		}
 		
@@ -107,6 +127,9 @@ public class ChatServerImpl implements ChatServer {
 			//Cierre del socket
 			socket.close();
 			socketServ.close();
+			
+			// Se informa del cierre
+			System.out.println("El servidor ha sido apagado.");
 			
 		}catch(IOException e) {
 			e.printStackTrace();
@@ -125,9 +148,9 @@ public class ChatServerImpl implements ChatServer {
 	@Override
 	public void broadcast(ChatMessage mensaje) {
 		// Envío de los mensajes a todos los clientes
-		for (int hiloCliente :cjtoHilosCliente.keySet()) {
+		for (int hiloCliente :cjtoClientes.keySet()) {
 			if(hiloCliente !=mensaje.getId()) {
-				cjtoHilosCliente.get(hiloCliente).sendMessage(mensaje);
+				cjtoClientes.get(hiloCliente).sendMessage(mensaje);
 			}
 		}
 
@@ -144,10 +167,10 @@ public class ChatServerImpl implements ChatServer {
 		broadcast(new ChatMessage(id,MessageType.LOGOUT,"Fernando patrocina el mensaje: se va a eliminar su usuario"));
 		
 		//Se para el chat del usuario
-		cjtoHilosCliente.get(id).stopChat();
+		cjtoClientes.get(id).stopChat();
 		
 		//Se elimina el hilo del diccionario
-		cjtoHilosCliente.remove(id);
+		cjtoClientes.remove(id);
 
 	}
 	
@@ -169,8 +192,8 @@ public class ChatServerImpl implements ChatServer {
 	 * @param id
 	 */
 	public void setClientId(int nuevoId, int id) {
-		cjtoHilosCliente.put(nuevoId, cjtoHilosCliente.get(id));
-		cjtoHilosCliente.remove(id);
+		cjtoClientes.put(nuevoId, cjtoClientes.get(id));
+		cjtoClientes.remove(id);
 		
 	}
 
@@ -208,8 +231,9 @@ public class ChatServerImpl implements ChatServer {
 		 * @param id
 		 * @param socket
 		 */
-		public ServerThreadForClient(int id, Socket socket) {
+		public ServerThreadForClient(int id, String username, Socket socket) {
 			this.id = id;
+			this.username = username; 
 			this.socket = socket;
 			this.activo = true;
 			
