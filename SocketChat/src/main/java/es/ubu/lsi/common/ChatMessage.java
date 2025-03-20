@@ -1,11 +1,12 @@
 package es.ubu.lsi.common;
 
-import java.io.Serializable;
+import java.io.*;
 
 /**
  * Mensaje que aparece en el chat
  * 
- * @Autor Fernando Arroyo
+ * @autor Raúl Marticorena
+ * @author Joaquin P. Seco
  */
 
 public class ChatMessage implements Serializable {

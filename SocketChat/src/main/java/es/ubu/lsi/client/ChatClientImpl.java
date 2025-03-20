@@ -3,9 +3,7 @@
  */
 package es.ubu.lsi.client;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -16,7 +14,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import es.ubu.lsi.common.ChatMessage;
-import es.ubu.lsi.common.ChatMessage.MessageType;
+import es.ubu.lsi.common.ChatMessage.*;
 
 /**
  * Implementa el chat del cliente
@@ -38,7 +36,7 @@ public class ChatClientImpl implements ChatClient {
 	private String username;
 	
 	//Puerto por el que se comunica el cliente
-	private static int port=DEFAULT_PORT;
+	private int port;
 	
 	//
 	private boolean carryOn = true;
@@ -55,8 +53,6 @@ public class ChatClientImpl implements ChatClient {
 	//Variable Listener
 	private ChatClientListener escuchaCliente;
 	
-	//Diccionario para almacenar los usuarios baneados
-	private Map<Integer,String> baneados = new HashMap<Integer,String>();
 	
 	//Variable socket para la gestión de las conexiones
 	private static Socket socket;
@@ -76,8 +72,6 @@ public class ChatClientImpl implements ChatClient {
 		this.server = server;
 		this.username = username;
 		this.port = port;
-	//	this.id = username.hashCode();
-	//	this.carryOn= false;
 	}
 	
 	/*
@@ -117,24 +111,21 @@ public class ChatClientImpl implements ChatClient {
 			//Mensaje de bienvenida si la conexión es correcta
 			System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
 					"]. Conexión establecida correctamente");
-			/*
-			System.out.println("Fernando patrocina el mensaje: Cliente nuevo en servidor: / " + server + 
-					" Usuario: " + username);
-			*/
+			
 			//Creación de las entradas y salidas
 			in = new ObjectInputStream(socket.getInputStream());
 			out = new ObjectOutputStream(socket.getOutputStream());
 			
 			// Registro de entrada en el servidor
-			ChatMessage registro = new ChatMessage (0,MessageType.MESSAGE,String.format("username %s", username));
+			ChatMessage registro = new ChatMessage (id,MessageType.MESSAGE,String.format("username %s", username));
 			sendMessage(registro);
 			
 			//Se recibe el id de cliente proporcionado por el servidor
 			ChatMessage confirmacion =  (ChatMessage) in.readObject();
-			id =confirmacion.getId();
+			id = confirmacion.getId();
 			
 			//Apertura de mensajes para el cliente
-			out.writeObject(new ChatMessage(id,MessageType.MESSAGE,username));
+		//	out.writeObject(new ChatMessage(id,MessageType.MESSAGE,username));
 			
 			//Creación del oyente
 			escuchaCliente = new ChatClientListener(in);
@@ -146,13 +137,13 @@ public class ChatClientImpl implements ChatClient {
 		}catch(IOException e) {
 			e.printStackTrace();
 			return false;
-		}catch(Exception e) {
+		}catch(Exception e) { //Si no se puede conectar se comunica y se desconecta
 			e.getMessage();
 			disconnect();
 			return false;
 		}
 		//Al terminar el chat se desconecta al usuario
-		disconnect();
+		//disconnect();
 		return true;
 	}
 	
@@ -203,66 +194,79 @@ public class ChatClientImpl implements ChatClient {
 	/**
 	 * @param args
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		// Variables para gestión de los argumentos
-		String server = ""; // identificación del servidor que se recibe por parámetro
-		String username = ""; // identificación del usuario que se recibe por parámetro
-		
-		//En función de los parámetros recibidos se actualiza el valor de las variables
+		String server = null; // identificación del servidor que se recibe por parámetro
+		String username = null; // identificación del usuario que se recibe por parámetro
+		int port =0;
+		// En función de los parámetros recibidos se actualiza el valor de las variables
 		switch (args.length) {
-			case 1: //Cuando hay solamente un argumento, éste corresponde al usuario
-				server = DEFAULT_HOST; //El servidor será el servidor por defecto
-				username = args[0]; //El usuario será el que se pase por argumento
-				break;
-				
-			case 2: // en este caso se reciben ambos datos
-				server = args[0]; // el servidor en la primera posición
-				username = args[1]; // el usuario en la segunda
-				break;
-				
-			default: // En cualquier otro caso se envia mensaje de advertencia
-				System.out.println("Fernando patrocina el mensaje:"
-						+"Error. Pasar por parámetos [servidor] (opcional) <usuario> (obligatorio)");
-				break;
+		case 1: // Cuando hay solamente un argumento, éste corresponde al usuario
+			server = DEFAULT_HOST; // El servidor será el servidor por defecto
+			username = args[0]; // El usuario será el que se pase por argumento
+			port=DEFAULT_PORT; // El puerto sera el puerto por defecto
+			break;
+
+		case 2: // en este caso se reciben ambos datos
+			server = args[0]; // el servidor en la primera posición
+			username = args[1]; // el usuario en la segunda
+			port=DEFAULT_PORT; // El puerto sera el puerto por defecto
+			break;
+			
+		case 3: // en este caso se reciben ambos datos
+			server = args[0]; // el servidor en la primera posición
+			username = args[1]; // el usuario en la segunda
+			port=Integer.parseInt(args[0]); // El puerto en la tecera
+			break;
+
+		default: // En cualquier otro caso se envia mensaje de advertencia
+			System.out.println("Fernando patrocina el mensaje:"
+					+ "Error. Pasar por parámetos [servidor] (opcional) <usuario> (obligatorio) [puerto] (opcional)");
+			break;
 		}
-		
-		System.out.println("Fernando patrocina el mensaje: Escuchando al puerto: " + port );
-		
+
+		System.out.println("Fernando patrocina el mensaje: Bienvenido: " + username);
+		System.out.println("Fernando patrocina el mensaje: Conectando al puerto: " + port +
+				" del servidor: " + server);
+
 		// Una vez registrados los parámetros se lanza el chat
-		ChatClient cliente = new ChatClientImpl(server,username,port);
+		ChatClientImpl cliente = new ChatClientImpl(server, username,port);
 		cliente.start();
 		int id = cliente.hashCode();
-		
-		//Mensaje de bienvenida
-		System.out.println("Fernando patrocina el mensaje: Conexión establecida con el servidor, introducza su post " );
-		
-		Scanner lectura = new Scanner (System.in);
-	
-		while (true) {
-			String enviado = lectura.nextLine();
-			String[] enviadoVector = enviado.split("",2);
-			ChatMessage mensaje;
-			
-			//Identificación del tipo de mensaje
-			if("logout".equalsIgnoreCase(enviadoVector[0])) {
-				mensaje= new ChatMessage(id,MessageType.LOGOUT,enviado);
-			}else if ("shutdown".equalsIgnoreCase(enviadoVector[0])) {
-				mensaje= new ChatMessage(id,MessageType.SHUTDOWN,enviado);
-			}else {
-				mensaje= new ChatMessage(id,MessageType.MESSAGE,enviado);
+
+		// Mensaje de bienvenida
+		System.out.println("Fernando patrocina el mensaje: Conexión establecida con el servidor, introducza su post ");
+
+		try (Scanner lectura = new Scanner(System.in)) {
+			while (true) {
+				String enviado = lectura.nextLine();
+				String[] enviadoV = enviado.split("", 2);
+				ChatMessage mensaje=null;
+
+				// Identificación del tipo de mensaje
+				if ("logout".equalsIgnoreCase(enviadoV[0])) {
+					mensaje = new ChatMessage(cliente.getId(), MessageType.LOGOUT, enviado);
+				} else if ("shutdown".equalsIgnoreCase(enviadoV[0])) {
+					mensaje = new ChatMessage(cliente.getId(), MessageType.SHUTDOWN, enviado);
+				} else {
+					mensaje = new ChatMessage(cliente.getId(), MessageType.MESSAGE, enviado);
+				}
+
+				// Envio del mensaje
+				cliente.sendMessage(mensaje);
+
+				// Cuando el mensaje sea de logout se desconecta al cliente
+				if (mensaje.getTipo() == MessageType.LOGOUT) {
+					cliente.disconnect();
+					break;
+
+				}
 			}
-			
-			//Envio del mensaje
-			cliente.sendMessage(mensaje);
-			
-			//Cuando el mensaje sea de logout se desconecta al cliente
-			if(mensaje.getTipo() == MessageType.LOGOUT) {
-				cliente.disconnect();
-				break;
-				
-			}
+			lectura.close();
 		}
 		
+		
+
 	}
 	
 	private static class ChatClientListener implements Runnable{
@@ -322,7 +326,7 @@ public class ChatClientImpl implements ChatClient {
 				} catch (IOException e) {
 					e.printStackTrace();
 				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
+					throw new RuntimeException(e);
 				}
 			}
 		}
