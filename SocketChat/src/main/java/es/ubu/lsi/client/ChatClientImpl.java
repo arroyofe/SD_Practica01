@@ -9,8 +9,6 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Scanner;
 
 import es.ubu.lsi.common.ChatMessage;
@@ -42,7 +40,7 @@ public class ChatClientImpl implements ChatClient {
 	private boolean carryOn = true;
 	
 	//identificación numérica del cliente
-	private int id;
+	private static int id;
 	
 	//Flujo de entrada
 	private ObjectInputStream in;
@@ -72,6 +70,16 @@ public class ChatClientImpl implements ChatClient {
 		this.server = server;
 		this.username = username;
 		this.port = port;
+		
+		try {
+			this.socket = new Socket(this.server,this.port);
+			out = new ObjectOutputStream(socket.getOutputStream());
+			
+		}catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);;
+			
+		}
 	}
 	
 	/*
@@ -105,45 +113,64 @@ public class ChatClientImpl implements ChatClient {
 	@Override
 	public boolean start() {
 		try {
-			//Apertura de la connexión
-			socket = new Socket(server,port);
-			
 			//Mensaje de bienvenida si la conexión es correcta
 			System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
 					"]. Conexión establecida correctamente");
 			
-			//Creación de las entradas y salidas
-			in = new ObjectInputStream(socket.getInputStream());
-			out = new ObjectOutputStream(socket.getOutputStream());
+			//Envío del nombre de usuario al servidor
+			ChatMessage mensaje = new ChatMessage(0,MessageType.MESSAGE,username);
 			
-			// Registro de entrada en el servidor
-			ChatMessage registro = new ChatMessage (id,MessageType.MESSAGE,String.format("username %s", username));
-			sendMessage(registro);
+			try {
+				in = new ObjectInputStream(socket.getInputStream());
+				sendMessage(mensaje);
+				mensaje = (ChatMessage) in.readObject();
+				
+				if (mensaje.getType()==MessageType.LOGOUT) {
+					System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
+					"]. Se procede a la desconexión");
+				}
+				
+				// Se actualiza el id con id del servidor
+				id=mensaje.getId();
+				System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
+						"]. El id recibido del servidor es: " + id);
+				
+				//Se lanza el hilo del cliente
+				new Thread(new ChatClientListener(in)).start();
+				
+			}catch(IOException | ClassNotFoundException e) {
+				e.getStackTrace();
+				System.exit(1);
+			}
 			
-			//Se recibe el id de cliente proporcionado por el servidor
-			ChatMessage confirmacion =  (ChatMessage) in.readObject();
-			id = confirmacion.getId();
+			try (Scanner entrada = new Scanner(System.in)){
+				
+				while (carryOn) {
+					String texto = entrada.nextLine();
+					
+					switch(texto.toUpperCase()){
+					case "LOGOUT":
+						sendMessage(new ChatMessage(id,MessageType.LOGOUT,""));
+						return true;
+					
+					case "SHUTDOWN":
+						sendMessage(new ChatMessage(id,MessageType.SHUTDOWN,""));
+						return true;
+					
+					default:
+						sendMessage(new ChatMessage(id,MessageType.MESSAGE,texto));
+						break;
+					
+					}
+				}
+				
+			}
 			
-			//Apertura de mensajes para el cliente
-		//	out.writeObject(new ChatMessage(id,MessageType.MESSAGE,username));
-			
-			//Creación del oyente
-			escuchaCliente = new ChatClientListener(in);
-			escuchaCliente.setOwner(this);
-			
-			//Creación de un hilo nuevo del cliente
-			new Thread(escuchaCliente).start();
-			
-		}catch(IOException e) {
-			e.printStackTrace();
-			return false;
-		}catch(Exception e) { //Si no se puede conectar se comunica y se desconecta
-			e.getMessage();
+		}finally{ //Si no se puede conectar se comunica y se desconecta
+			//Al terminar el chat se desconecta al usuario
 			disconnect();
-			return false;
 		}
-		//Al terminar el chat se desconecta al usuario
-		//disconnect();
+		
 		return true;
 	}
 	
@@ -160,6 +187,7 @@ public class ChatClientImpl implements ChatClient {
 			out.writeObject (message);
 		}catch (IOException e){
 			e.printStackTrace();
+			disconnect();
 		}
 
 	}
@@ -177,6 +205,7 @@ public class ChatClientImpl implements ChatClient {
 		
 		//Se cierran los streams y el socket
 		try {
+			carryOn= false;
 			out.close();
 			in.close();
 			socket.close();
@@ -232,54 +261,16 @@ public class ChatClientImpl implements ChatClient {
 		// Una vez registrados los parámetros se lanza el chat
 		ChatClientImpl cliente = new ChatClientImpl(server, username,port);
 		cliente.start();
-		int id = cliente.hashCode();
-
-		// Mensaje de bienvenida
-		System.out.println("Fernando patrocina el mensaje: Conexión establecida con el servidor, introducza su post ");
-
-		try (Scanner lectura = new Scanner(System.in)) {
-			while (true) {
-				String enviado = lectura.nextLine();
-				String[] enviadoV = enviado.split("", 2);
-				ChatMessage mensaje=null;
-
-				// Identificación del tipo de mensaje
-				if ("logout".equalsIgnoreCase(enviadoV[0])) {
-					mensaje = new ChatMessage(cliente.getId(), MessageType.LOGOUT, enviado);
-				} else if ("shutdown".equalsIgnoreCase(enviadoV[0])) {
-					mensaje = new ChatMessage(cliente.getId(), MessageType.SHUTDOWN, enviado);
-				} else {
-					mensaje = new ChatMessage(cliente.getId(), MessageType.MESSAGE, enviado);
-				}
-
-				// Envio del mensaje
-				cliente.sendMessage(mensaje);
-
-				// Cuando el mensaje sea de logout se desconecta al cliente
-				if (mensaje.getTipo() == MessageType.LOGOUT) {
-					cliente.disconnect();
-					break;
-
-				}
-			}
-			lectura.close();
-		}
-		
 		
 
 	}
 	
-	private static class ChatClientListener implements Runnable{
+	class ChatClientListener implements Runnable{
 		//Variable de Entrada de datos
 		private ObjectInputStream in;
 		
 		// Booleano para saber si el cliente está activo y actuar en consecuencia
 		private boolean activo=true;
-		
-		// Propietario del chat
-		private ChatClientImpl propietario;
-		
-		
 		
 		/*
 		 * Arranca el oyente
@@ -299,38 +290,30 @@ public class ChatClientImpl implements ChatClient {
 			activo= false;
 		}
 		
-		/*
-		 * Método set para crear el cliente propietario del post en el chat
-		 * 
-		 * @param propietario del post
-		 */
-		public void setOwner(ChatClientImpl propietario) {
-			this.propietario = propietario;
-			
-		}
-
-
+		
 		/*
 		 * Arranca el chat
 		 */
 		@Override
 		public void run() {
-			while (socket.isConnected()) {
-				try {
-					ChatMessage mensaje = (ChatMessage) in.readObject();
-					if (mensaje.getTipo() == MessageType.MESSAGE) {
-						System.out.println(
-								"Fernando patrocina el mensaje: " + mensaje.getId() + " " + mensaje.getMessage());
+			
+			
+				while (true) {
+					ChatMessage mensaje;
+					try {
+						mensaje = (ChatMessage) in.readObject();
+						System.out.println(mensaje.getMessage());
+						
+					} catch (ClassNotFoundException | IOException e) {
+						
+						e.printStackTrace();
 					}
+					
 
-				} catch (IOException e) {
-					e.printStackTrace();
-				} catch (ClassNotFoundException e) {
-					throw new RuntimeException(e);
 				}
-			}
+	
 		}
-
 	}
+		
 
 }

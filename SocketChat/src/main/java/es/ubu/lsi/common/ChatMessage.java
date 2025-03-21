@@ -42,7 +42,7 @@ public class ChatMessage implements Serializable {
 	 */
 	public ChatMessage(int id, MessageType tipo, String mensaje) {
 		this.setId(id);
-		this.setTipo(tipo);
+		this.setType(tipo);
 		this.setMessage(mensaje);
 	}
 
@@ -50,7 +50,7 @@ public class ChatMessage implements Serializable {
 	 * Obtiene el tipo
 	 * @return tipo
 	 */
-	public MessageType getTipo() {
+	public MessageType getType() {
 		return tipo;
 	}
 	
@@ -58,7 +58,7 @@ public class ChatMessage implements Serializable {
 	 * Establece el tipo
 	 * @param tipo
 	 */
-	public void setTipo(MessageType tipo) {
+	public void setType(MessageType tipo) {
 		this.tipo = tipo;
 	}
 	
