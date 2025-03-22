@@ -12,6 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import es.ubu.lsi.common.ChatMessage;
 import es.ubu.lsi.common.ChatMessage.MessageType;
@@ -49,8 +50,8 @@ public class ChatServerImpl implements ChatServer {
 	//Diccionario con los datos de los usuarios
 	Map<Integer,String> cjtoClientes;
 	
-	//Diccionario de clientes baneaso
-	Map<Integer,String> cjtoClientesBaneados;
+	//Diccionario de clientes baneados
+	Map<String,Boolean> cjtoClientesBaneados;
 	
 	
 
@@ -63,7 +64,7 @@ public class ChatServerImpl implements ChatServer {
 		this(DEFAULT_PORT);
 		this.alive=true;
 		this.cjtoClientes = new HashMap<Integer,String>();
-		this. cjtoClientesBaneados = new HashMap<Integer,String>();
+		this. cjtoClientesBaneados = new HashMap<String,Boolean>();
 		this.cjtoHilosClientes = new HashMap<String,ServerThreadForClient>() ;
 	}
 
@@ -79,12 +80,12 @@ public class ChatServerImpl implements ChatServer {
 		this.port=port;
 		this.alive=true;
 		this.cjtoClientes = new HashMap<Integer,String>();
-		this. cjtoClientesBaneados = new HashMap<Integer,String>();
+		this. cjtoClientesBaneados = new HashMap<String,Boolean>();
 		this.cjtoHilosClientes = new HashMap<String,ServerThreadForClient>() ;
 	}
 	
 	private synchronized int getNextId() {
-		return clientId++;
+		return ++clientId;
 	}
 	
 	@Override
@@ -164,22 +165,50 @@ public class ChatServerImpl implements ChatServer {
 	 */
 	@Override
 	public void broadcast(ChatMessage mensaje) {
-		
+
 		int usuarioEnvio = mensaje.getId();
 		MessageType tipo = mensaje.getType();
 		String contenido = mensaje.getMessage();
-		
-		
+
+		// Antes de enviar, se comprueba si es mensaje de baneo/desbaneo
+		String[] analisis = contenido.trim().split("\\s+", 2);
+
+		if (analisis.length > 1) {
+			String orden = analisis[0];
+			String usuarioBan = analisis[1];
+			if (orden.equals("ban")&& !cjtoClientesBaneados.containsKey(usuarioBan)) {
+				cjtoClientesBaneados.put(usuarioBan, true);
+			/*	String mensajeBaneo = String.format(
+						"Fernando patrocina este mensaje: El cliente %s ha sido baneado por % ", usuarioBan,
+						usuarioEnvio);
+				contenido = mensajeBaneo;*/
+				cjtoClientesBaneados.forEach((key, value) -> System.out.println("Key: " + key + " Value: " + value));
+
+			} else if (orden.equals("unban") && cjtoClientesBaneados.containsKey(usuarioBan)) {
+				cjtoClientesBaneados.remove(usuarioBan, true);
+			/*	String mensajeDesbaneo = String.format(
+						"Fernando patrocina este mensaje: El cliente %s ha sido desbaneado por % ", usuarioBan,
+						usuarioEnvio);
+				contenido = mensajeDesbaneo;*/
+				cjtoClientesBaneados.forEach((key, value) -> System.out.println("Key: " + key + " Value: " + value));
+			}
+		}
 		// Envío de los mensajes a todos los clientes
-		for (ServerThreadForClient cliente :cjtoHilosClientes.values()) {
+		for (ServerThreadForClient cliente : cjtoHilosClientes.values()) {
+			String usuario = "";
+			for(Entry<String,ServerThreadForClient> entrada : cjtoHilosClientes.entrySet()) {
+				if (entrada.getValue() == cliente) {
+					usuario = entrada.getKey();
+				}
+			}
 			// Si el usuario está baneado no se envía el mensaje
-			if(cjtoClientesBaneados.get(usuarioEnvio) != null) {
+			if (cjtoClientesBaneados.get(usuario) != null) {
 				return;
-			}else {
-			
-				ChatMessage nuevo = new ChatMessage(usuarioEnvio,tipo,contenido);
+			} else {
+
+				ChatMessage nuevo = new ChatMessage(usuarioEnvio, tipo, contenido);
 				cliente.sendMessage(nuevo);
-				
+
 			}
 		}
 
@@ -193,17 +222,21 @@ public class ChatServerImpl implements ChatServer {
 	@Override
 	public void remove(int id) {
 		// Se informa en primer lugar al usuario que se va a cerrar 
-		broadcast(new ChatMessage(id,MessageType.LOGOUT,"Fernando patrocina el mensaje: se va a eliminar su usuario"));
+		broadcast(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: se va a eliminar su usuario"));
 		
-		//Se para el chat del usuario
-		cjtoHilosClientes.get(id).stopChat();
+		// Se recupera el usuario para cerrarel hilo corresponciente y 
+		// se para el chat del usuario
+		cjtoHilosClientes.get(cjtoClientes.get(id)).stopChat();
 		
-		//Se elimina el hilo del diccionario
+		// Se elimina el hilo
+		cjtoHilosClientes.remove(cjtoClientes.get(id));
+		
+		//Se elimina el cliente del diccionario
 		cjtoClientes.remove(id);
 		
-		// Si el cliente está en la lista de baneados se elimina
-		if(cjtoClientesBaneados.get(id) != null) {
-			cjtoClientesBaneados.remove(id);
+		// Si el cliente está en la lista de baneados se elimina igualmente
+		if(cjtoClientesBaneados.get(cjtoClientes.get(id)) != null) {
+			cjtoClientesBaneados.remove(cjtoClientes.get(id));
 		}
 
 	}
@@ -316,20 +349,21 @@ public class ChatServerImpl implements ChatServer {
 				
 				String usuario = primerMensaje.getMessage();
 				
-				if (cjtoClientes.containsKey(usuario)) {
+				if (cjtoClientes.containsValue(usuario)) {
 					out.writeObject(new ChatMessage(0,MessageType.LOGOUT,"Ese usuario ya está registrado"));
 				}else {
+					// Se añade la información del nuevo usuario y del hilo
 					this.id = getNextId();
 					cjtoClientes.put(id,usuario);
 					cjtoHilosClientes.put(usuario, this);
 					
 				}
 				
-				
-				
+							
 				//Se informa de la conexión del usuario
-				System.out.println("Fernando patrocina el mensaje : El usuario " + this.socket.getInetAddress().getHostName() +"con id:" 
-				+ this.id + " se ha conectado a las: " + ChatServerImpl.sdf.format(new Date( )));
+				System.out.println("Fernando patrocina el mensaje : El usuario " + usuario + " con ip " 
+						+ this.socket.getInetAddress().getHostName() +" y con id:" 
+						+ this.id +" se ha conectado a las: " + ChatServerImpl.sdf.format(new Date( ))  );
 				
 				System.out.println("Clientes conectados: "+ cjtoHilosClientes.size());
 				
@@ -338,7 +372,6 @@ public class ChatServerImpl implements ChatServer {
 				
 				out.writeObject(new ChatMessage(id,MessageType.MESSAGE,bienvenida));
 				
-			//	cjtoClientes.put(id,username);
 				
 				//Bucle degestión de los mensajes
 				while(activo) {
@@ -348,7 +381,7 @@ public class ChatServerImpl implements ChatServer {
 					//Si el cliente envía el mensaje de logout se le desactiv
 					if(mensaje.getType()==MessageType.LOGOUT) {
 						
-						System.out.println("Fernando patrocina el mensaje : " + this.username +"con id:" 
+						System.out.println("Fernando patrocina el mensaje : " + this.username +" con id:" 
 								+ this.id + " se ha desconectado a las: " + ChatServerImpl.sdf.format(new Date( )));						
 						activo = false;
 						remove(id);
@@ -359,7 +392,7 @@ public class ChatServerImpl implements ChatServer {
 								+ this.id + " se ha cerrado el servidor a las: " + ChatServerImpl.sdf.format(new Date( )));	
 						System.exit(1);
 					}else { //En caso contrario se publica el mensaje 
-						System.out.println("Fernando patrocina el mensaje : " + this.username +" con id:" 
+						System.out.println("Fernando patrocina el mensaje : El usuario " + this.username +" con id:" 
 								+ this.id + " ha publicado a las: " + ChatServerImpl.sdf.format(new Date( )));
 						
 						broadcast(mensaje);

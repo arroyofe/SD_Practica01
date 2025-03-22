@@ -125,11 +125,6 @@ public class ChatClientImpl implements ChatClient {
 				sendMessage(mensaje);
 				mensaje = (ChatMessage) in.readObject();
 				
-				if (mensaje.getType()==MessageType.LOGOUT) {
-					System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
-					"]. Se procede a la desconexión");
-				}
-				
 				// Se actualiza el id con id del servidor
 				id=mensaje.getId();
 				System.out.println("Fernando patrocina el mensaje: Son las: [" + hora.format(new Date() ) + 
@@ -151,10 +146,12 @@ public class ChatClientImpl implements ChatClient {
 					switch(texto.toUpperCase()){
 					case "LOGOUT":
 						sendMessage(new ChatMessage(id,MessageType.LOGOUT,""));
+						disconnect();
 						return true;
 					
 					case "SHUTDOWN":
 						sendMessage(new ChatMessage(id,MessageType.SHUTDOWN,""));
+						disconnect();
 						return true;
 					
 					default:
@@ -297,7 +294,7 @@ public class ChatClientImpl implements ChatClient {
 		@Override
 		public void run() {
 			
-			
+				// Se reciben los mensajes en  bucle
 				while (true) {
 					ChatMessage mensaje;
 					try {
