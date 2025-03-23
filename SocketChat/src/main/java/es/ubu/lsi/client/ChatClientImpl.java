@@ -15,8 +15,7 @@ import es.ubu.lsi.common.ChatMessage;
 import es.ubu.lsi.common.ChatMessage.*;
 
 /**
- * Implementa el chat del cliente
- * 
+ * Implementa el chat del cliente 
  * @author Fernando Arroyo
  */
 public class ChatClientImpl implements ChatClient {
@@ -59,6 +58,13 @@ public class ChatClientImpl implements ChatClient {
 	private SimpleDateFormat hora = new SimpleDateFormat("HH:mm:ss");
 	
 
+	/**
+	 * Instantiates a new chat client impl.
+	 *
+	 * @param server the server
+	 * @param username the username
+	 * @param port the port
+	 */
 	/*
 	 * Constructor Crea los datos del chat con todos los datos por parámetro
 	 * 
@@ -146,12 +152,12 @@ public class ChatClientImpl implements ChatClient {
 					switch(texto.toUpperCase()){
 					case "LOGOUT":
 						sendMessage(new ChatMessage(id,MessageType.LOGOUT,""));
-						disconnect();
+						carryOn=false;
 						return true;
 					
 					case "SHUTDOWN":
 						sendMessage(new ChatMessage(id,MessageType.SHUTDOWN,""));
-						disconnect();
+						carryOn = false;
 						return true;
 					
 					default:
@@ -163,7 +169,7 @@ public class ChatClientImpl implements ChatClient {
 				
 			}
 			
-		}finally{ //Si no se puede conectar se comunica y se desconecta
+		}finally{
 			//Al terminar el chat se desconecta al usuario
 			disconnect();
 		}
@@ -194,15 +200,16 @@ public class ChatClientImpl implements ChatClient {
 	 */
 	@Override
 	public void disconnect() {
-		// Se pasa el carriOn a false para indicar el final
-		carryOn = false;
 		
 		// Se para el oyente
 		escuchaCliente.pararChat();
 		
+		// Se pasa el carriOn a false para indicar el final
+		carryOn = false;
+		
+				
 		//Se cierran los streams y el socket
 		try {
-			carryOn= false;
 			out.close();
 			in.close();
 			socket.close();
@@ -210,6 +217,8 @@ public class ChatClientImpl implements ChatClient {
 		}catch(IOException e) {
 			e.printStackTrace();
 		}
+		
+		System.exit(0);
 
 	}
 	
@@ -285,6 +294,7 @@ public class ChatClientImpl implements ChatClient {
 		 */
 		public void pararChat() {
 			activo= false;
+			carryOn = false;
 		}
 		
 		
@@ -295,7 +305,7 @@ public class ChatClientImpl implements ChatClient {
 		public void run() {
 			
 				// Se reciben los mensajes en  bucle
-				while (true) {
+				while (carryOn) {
 					ChatMessage mensaje;
 					try {
 						mensaje = (ChatMessage) in.readObject();
@@ -305,10 +315,7 @@ public class ChatClientImpl implements ChatClient {
 						
 						e.printStackTrace();
 					}
-					
-
 				}
-	
 		}
 	}
 		

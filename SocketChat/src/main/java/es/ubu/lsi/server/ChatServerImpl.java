@@ -178,22 +178,16 @@ public class ChatServerImpl implements ChatServer {
 			String usuarioBan = analisis[1];
 			if (orden.equals("ban")&& !cjtoClientesBaneados.containsKey(usuarioBan)) {
 				cjtoClientesBaneados.put(usuarioBan, true);
-			/*	String mensajeBaneo = String.format(
-						"Fernando patrocina este mensaje: El cliente %s ha sido baneado por % ", usuarioBan,
-						usuarioEnvio);
-				contenido = mensajeBaneo;*/
-				cjtoClientesBaneados.forEach((key, value) -> System.out.println("Key: " + key + " Value: " + value));
+				// Solamente para chequear el conjunto de baneados
+				cjtoClientesBaneados.forEach((key, value) -> System.out.println("Cliente baneado clave: " + key + " nick de usuario: " + value));
 
 			} else if (orden.equals("unban") && cjtoClientesBaneados.containsKey(usuarioBan)) {
 				cjtoClientesBaneados.remove(usuarioBan, true);
-			/*	String mensajeDesbaneo = String.format(
-						"Fernando patrocina este mensaje: El cliente %s ha sido desbaneado por % ", usuarioBan,
-						usuarioEnvio);
-				contenido = mensajeDesbaneo;*/
-				cjtoClientesBaneados.forEach((key, value) -> System.out.println("Key: " + key + " Value: " + value));
+				// Solamente para chequearel conjunto de baneados
+				cjtoClientesBaneados.forEach((key, value) -> System.out.println("Cliente baneado clave: " + key + " nick de usuario: " + value));
 			}
 		}
-		// Envío de los mensajes a todos los clientes
+		// Envío de los mensajes a todos los clientes no baneados
 		for (ServerThreadForClient cliente : cjtoHilosClientes.values()) {
 			String usuario = "";
 			for(Entry<String,ServerThreadForClient> entrada : cjtoHilosClientes.entrySet()) {
@@ -222,7 +216,7 @@ public class ChatServerImpl implements ChatServer {
 	@Override
 	public void remove(int id) {
 		// Se informa en primer lugar al usuario que se va a cerrar 
-		broadcast(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: se va a eliminar su usuario"));
+		broadcast(new ChatMessage(id,MessageType.MESSAGE,"Fernando patrocina el mensaje: se va a eliminar el usuario " + id));
 		
 		// Se recupera el usuario para cerrarel hilo corresponciente y 
 		// se para el chat del usuario
@@ -241,19 +235,7 @@ public class ChatServerImpl implements ChatServer {
 
 	}
 	
-
-	
-	/*
-	 * Hace que el hash del cliente sea su id para la sesión,borrando el valor precedente
-	 * 
-	 * @param nuevoId
-	 * @param id
-	 */
-	public void setClientId(int nuevoId, int id) {
-		cjtoClientes.put(nuevoId, cjtoClientes.get(id));
-		cjtoClientes.remove(id);
 		
-	}
 
 	/**
 	 * @param args
